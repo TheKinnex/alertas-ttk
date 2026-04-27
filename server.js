@@ -45,6 +45,17 @@ tiktok.on(WebcastEvent.FOLLOW, (data) => {
   emitFollow(username);
 });
 
+function requireOptionalTestSecret(req, res) {
+  const required = process.env.TEST_FOLLOW_SECRET;
+  if (required && req.query.secret !== required) {
+    res.status(403).type('text/plain').send('Falta secret válido (TEST_FOLLOW_SECRET en .env).');
+    return false;
+  }
+  return true;
+}
+
+let reconnectBusy = false;
+
 app.get('/health', (_req, res) => {
   res.status(200).type('text/plain').send('ok');
 });
@@ -60,9 +71,7 @@ app.get('/api/media-config.json', (req, res) => {
 });
 
 function handleTestFollow(req, res) {
-  const required = process.env.TEST_FOLLOW_SECRET;
-  if (required && req.query.secret !== required) {
-    res.status(403).type('text/plain').send('Falta secret válido (TEST_FOLLOW_SECRET en .env).');
+  if (!requireOptionalTestSecret(req, res)) {
     return;
   }
   const raw =
@@ -79,6 +88,32 @@ function handleTestFollow(req, res) {
 
 app.get('/api/test-follow/:username', handleTestFollow);
 app.get('/api/test-follow', handleTestFollow);
+
+app.get('/api/reconnect-tiktok', async (req, res) => {
+  if (!requireOptionalTestSecret(req, res)) {
+    return;
+  }
+  if (reconnectBusy) {
+    res.status(429).json({ ok: false, error: 'reconnect_in_progress' });
+    return;
+  }
+  reconnectBusy = true;
+  try {
+    try {
+      await tiktok.disconnect();
+    } catch (e) {
+      console.warn('[reconnect-tiktok] disconnect:', e?.message || e);
+    }
+    const state = await tiktok.connect();
+    console.log('[reconnect-tiktok] conectado', state.roomId ? `roomId=${state.roomId}` : '');
+    res.json({ ok: true, roomId: state.roomId ?? null });
+  } catch (err) {
+    console.error('[reconnect-tiktok]', err?.message || err);
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  } finally {
+    reconnectBusy = false;
+  }
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -99,6 +134,7 @@ server.listen(PORT, '0.0.0.0', () => {
       : `http://localhost:${PORT}`;
   console.log(`Overlay: ${base}/`);
   console.log(`Prueba follow: ${base}/api/test-follow/test_user`);
+  console.log(`Reconectar TikTok: ${base}/api/reconnect-tiktok  (mismo secret que test-follow si TEST_FOLLOW_SECRET está definido)`);
   console.log(`Usuario TikTok: @${tiktokUsername}`);
   console.log('Carpeta de medios (follow):', assetsFollowDir);
   for (const [label, name] of [
