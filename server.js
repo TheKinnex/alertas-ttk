@@ -73,9 +73,13 @@ app.get('/api/test-follow', handleTestFollow);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = Number(process.env.PORT) || 3000;
-server.listen(PORT, () => {
-  console.log(`Overlay: http://localhost:${PORT}`);
-  console.log(`Prueba follow: http://localhost:${PORT}/api/test-follow/test_user  (evita ? en scripts de Windows)`);
+server.listen(PORT, '0.0.0.0', () => {
+  const base =
+    process.env.RAILWAY_PUBLIC_DOMAIN != null && process.env.RAILWAY_PUBLIC_DOMAIN !== ''
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : `http://localhost:${PORT}`;
+  console.log(`Overlay: ${base}/`);
+  console.log(`Prueba follow: ${base}/api/test-follow/test_user`);
   console.log(`Usuario TikTok: @${tiktokUsername}`);
   console.log('Carpeta de medios (follow):', assetsFollowDir);
   for (const [label, name] of [
