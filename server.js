@@ -15,9 +15,24 @@ const assetsFollowDir = path.resolve(
 const webmFile = path.basename(process.env.FOLLOW_WEBM_FILE || 'new-follower.webm');
 const mp3File = path.basename(process.env.FOLLOW_SOUND_FILE || 'woosh.mp3');
 
+function resolveListenPort() {
+  const raw = process.env.PORT;
+  if (raw == null || String(raw).trim() === '') {
+    return 3000;
+  }
+  const n = parseInt(String(raw), 10);
+  if (!Number.isFinite(n) || n < 1 || n > 65535) {
+    console.error('[port] PORT inválido, se usa 3000. Valor recibido:', JSON.stringify(raw));
+    return 3000;
+  }
+  return n;
+}
+
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: { origin: true },
+});
 
 const tiktok = new TikTokLiveConnection(tiktokUsername);
 
@@ -25,18 +40,13 @@ function emitFollow(username) {
   io.emit('follow', { username });
 }
 
-tiktok
-  .connect()
-  .then((state) => {
-    console.log('Conectado a TikTok Live', state.roomId ? `roomId=${state.roomId}` : '');
-  })
-  .catch((err) => {
-    console.error('No se pudo conectar (¿estás en vivo con ese @?):', err.message || err);
-  });
-
 tiktok.on(WebcastEvent.FOLLOW, (data) => {
   const username = data.user?.uniqueId || data.user?.nickname || 'alguien';
   emitFollow(username);
+});
+
+app.get('/health', (_req, res) => {
+  res.status(200).type('text/plain').send('ok');
 });
 
 app.use('/media/follow', express.static(assetsFollowDir));
@@ -72,8 +82,17 @@ app.get('/api/test-follow', handleTestFollow);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = resolveListenPort();
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+
 server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[listen] 0.0.0.0:${PORT} (process.env.PORT=${JSON.stringify(process.env.PORT)})`);
   const base =
     process.env.RAILWAY_PUBLIC_DOMAIN != null && process.env.RAILWAY_PUBLIC_DOMAIN !== ''
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -91,4 +110,15 @@ server.listen(PORT, '0.0.0.0', () => {
       console.warn(`[follow] Falta ${label}: ${name} → ${full}`);
     }
   }
+
+  setImmediate(() => {
+    tiktok
+      .connect()
+      .then((state) => {
+        console.log('Conectado a TikTok Live', state.roomId ? `roomId=${state.roomId}` : '');
+      })
+      .catch((err) => {
+        console.error('No se pudo conectar (¿estás en vivo con ese @?):', err.message || err);
+      });
+  });
 });
