@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overlay — nuevo follower</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <button type="button" id="audioUnlock" class="audio-unlock" aria-label="Activar sonido de alertas">
+    Clic aquí una vez para activar el sonido (en OBS: clic derecho en la fuente → Interact → clic aquí)
+  </button>
+  <div id="followLayer" class="hidden" aria-live="polite">
+    <div class="follow-stage" id="followStage">
+      <video id="followVideo" playsinline muted preload="auto"></video>
+      <div id="followName"></div>
+    </div>
+  </div>
+  <audio id="followSfx" preload="auto" src="/media/follow/woosh.mp3"></audio>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
